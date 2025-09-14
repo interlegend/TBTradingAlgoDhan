@@ -9,25 +9,10 @@ from datetime import datetime
 import pytz
 from typing import Dict, Set
 
+from config import ALIAS_MAP
+
 # --- CONFIGURATION ---
 IST = pytz.timezone("Asia/Kolkata")
-
-# Canonical names and their known aliases
-# This is the primary mapping used to resolve symbols and their properties.
-ALIAS_MAP: Dict[str, Dict] = {
-    "NIFTY": {
-        "aliases": {"NIFTY", "NIFTY 50", "NIFTY50", "NIFTY INDEX"},
-        "step": 50,
-    },
-    "BANKNIFTY": {
-        "aliases": {"BANKNIFTY", "NIFTY BANK", "BANKNIFTY INDEX"},
-        "step": 100,
-    },
-    "FINNIFTY": {
-        "aliases": {"FINNIFTY", "NIFTY FIN SERVICE", "FINNIFTY INDEX"},
-        "step": 50,
-    },
-}
 
 def _find_canonical_symbol(base_symbol: str) -> str:
     """Find the canonical name for a given alias (e.g., 'NIFTY 50' -> 'NIFTY')."""
@@ -78,26 +63,32 @@ def _normalize_instruments(df: pd.DataFrame) -> pd.DataFrame:
             
     return df
 
-def _latest_instrument_csv(pattern: str = "Dependencies/all_instrument*.csv") -> str:
-    """Find the most recently modified instrument file."""
-    # The glob should be relative to the project root.
-    # The user's CWD is c:\Users\sakth\Desktop\VSCODE
-    # The files are in c:\Users\sakth\Desktop\VSCODE\TB DHAN API ALGO\Dependencies
-    # So the pattern should be 'TB DHAN API ALGO/Dependencies/all_instrument*.csv'
-    
-    # Let's try to be more robust and check both locations
-    
-    proj_root_pattern = os.path.join('TB DHAN API ALGO', pattern)
-    
-    files = sorted(glob.glob(proj_root_pattern, recursive=True), key=os.path.getmtime)
-    
-    if not files:
-         files = sorted(glob.glob(pattern, recursive=True), key=os.path.getmtime)
+def _latest_instrument_csv() -> str:
+    """
+    Finds the most recent instrument CSV in the project's root 'Dependencies' folder,
+    with a fallback to the local 'Dependencies' folder.
+    """
+    # This script is in a subdirectory (e.g., 'TB DHAN API ALGO').
+    # We want to find the 'Dependencies' folder at the project root.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir) # Assumes one level down from root
 
-    if not files:
-        raise FileNotFoundError(f"No instrument CSV found matching pattern: {pattern} or {proj_root_pattern}")
-        
-    return files[-1]
+    # Primary search path: <project_root>/Dependencies/all_instrument*.csv
+    primary_pattern = os.path.join(project_root, 'Dependencies', 'all_instrument*.csv')
+    files = sorted(glob.glob(primary_pattern, recursive=False), key=os.path.getmtime)
+
+    if files:
+        return files[-1]
+
+    # Fallback search path: <script_dir>/Dependencies/all_instrument*.csv
+    fallback_pattern = os.path.join(script_dir, 'Dependencies', 'all_instrument*.csv')
+    files = sorted(glob.glob(fallback_pattern, recursive=False), key=os.path.getmtime)
+    
+    if files:
+        print("[WARN] Using fallback instrument file location. Consider moving to root Dependencies folder.")
+        return files[-1]
+
+    raise FileNotFoundError(f"No instrument CSV found in primary ({primary_pattern}) or fallback locations.")
 
 def get_atm_option_symbols(
     base_symbol: str,

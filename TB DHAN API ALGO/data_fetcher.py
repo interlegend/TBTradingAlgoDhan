@@ -11,9 +11,9 @@ import pytz
 import time
 from datetime import datetime
 
-from config import CLIENT_ID, ACCESS_TOKEN
+from config import CLIENT_ID, ACCESS_TOKEN, ALIAS_MAP
 from Dhan_Tradehull import Tradehull
-from order_manager import get_atm_option_symbols, ALIAS_MAP
+from order_manager import get_atm_option_symbols
 
 # --- CONFIGURATION ---
 IST = pytz.timezone("Asia/Kolkata")
@@ -133,8 +133,8 @@ def get_index_ohlc(
 
     aliases = ALIAS_MAP[canonical_name]["aliases"]
     
-    # Indices are fetched from the INDEX segment
-    df = _try_symbols(aliases, exchange="INDEX", interval=iv)
+    # Indices are fetched from the NSE segment, not INDEX
+    df = _try_symbols(aliases, exchange="NSE", interval=iv)
 
     if df is None or df.empty:
         print(f"[ERROR] Could not retrieve {base_symbol.upper()} candles.")
