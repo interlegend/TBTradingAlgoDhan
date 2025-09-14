@@ -1,0 +1,5 @@
+{
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.addHoverSummaries": true
+}

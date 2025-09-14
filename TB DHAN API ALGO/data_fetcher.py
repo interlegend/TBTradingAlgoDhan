@@ -1,0 +1,203 @@
+"""
+Data Fetcher for Trader-Baddu Phase 2
+
+Handles resilient fetching of OHLC data for indices and options.
+"""
+from __future__ import annotations
+
+from typing import Optional, List, Union, Dict, Set
+import pandas as pd
+import pytz
+import time
+from datetime import datetime
+
+from config import CLIENT_ID, ACCESS_TOKEN
+from Dhan_Tradehull import Tradehull
+from order_manager import get_atm_option_symbols, ALIAS_MAP
+
+# --- CONFIGURATION ---
+IST = pytz.timezone("Asia/Kolkata")
+_TSL: Optional[Tradehull] = None
+_VALID_TF = {1, 2, 3, 5, 10, 15, 30, 60}
+
+# ---------------------------
+# Client Bootstrap & Preflight
+# ---------------------------
+def set_tsl(client: Optional[Tradehull] = None) -> None:
+    """Initializes the global Tradehull client, with an auth preflight check."""
+    global _TSL
+    if client is None:
+        print(f"[INFO] Initializing Tradehull client...")
+        client = Tradehull(ClientCode=CLIENT_ID, token_id=ACCESS_TOKEN)
+    _TSL = client
+
+    try:
+        balance = _TSL.get_balance()
+        if isinstance(balance, (int, float)) and balance >= 0:
+            print(f"[SUCCESS] Tradehull client authenticated. Available balance: {balance}")
+        else:
+            raise RuntimeError(f"Authentication preflight failed. Response: {balance}")
+    except Exception as e:
+        print(f"[FATAL] Could not init TradeHull client (token/auth): {e}")
+        raise
+
+def _ensure_client(auto_init: bool = True) -> Tradehull:
+    """Ensures the TradeHull client is initialized, calling set_tsl() if needed."""
+    global _TSL
+    if _TSL is None:
+        if auto_init:
+            set_tsl()
+        else:
+            raise RuntimeError("TradeHull client not initialized. Call set_tsl() first.")
+    return _TSL
+
+# ---------------------------
+# Utilities
+# ---------------------------
+def _coerce_timeframe(tf: Union[int, str, None], default: int = 5) -> int:
+    """Coerces a timeframe string/int to a valid integer."""
+    if tf is None: return default
+    try:
+        tf = int(str(tf).strip().lower().replace("m", ""))
+        if tf not in _VALID_TF:
+            raise ValueError(f"Invalid timeframe '{tf}'. Allowed: {_VALID_TF}")
+        return tf
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Could not parse timeframe '{tf}': {e}")
+
+def _normalize_ohlc_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Renames timestamp, normalizes timezone, and sorts an OHLC DataFrame."""
+    if df.empty:
+        return df
+    if "timestamp" in df.columns and "datetime" not in df.columns:
+        df = df.rename(columns={"timestamp": "datetime"})
+    
+    if "datetime" in df.columns:
+        df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
+        df = df.dropna(subset=["datetime"])
+        if getattr(df['datetime'].dt, "tz", None) is None:
+            df["datetime"] = df["datetime"].dt.tz_localize(IST)
+        else:
+            df["datetime"] = df["datetime"].dt.tz_convert(IST)
+        df = df.sort_values("datetime").drop_duplicates("datetime", keep="last")
+
+    # Ensure essential columns are present
+    for col in ["open", "high", "low", "close", "volume"]:
+        if col not in df.columns:
+            raise ValueError(f"OHLC DataFrame missing required column: '{col}'")
+    return df
+
+# --------------------------------
+# Resilient Symbol OHLC Fetchers
+# --------------------------------
+def _try_symbols(symbols: Set[str], exchange: str, interval: int) -> pd.DataFrame:
+    """Tries multiple symbol aliases until one returns non-empty OHLC data."""
+    tsl = _ensure_client()
+    for sym in symbols:
+        try:
+            api_exchange = "INDEX" if exchange == "INDEX" else exchange
+            raw = tsl.get_intraday_data(tradingsymbol=sym, exchange=api_exchange, timeframe=interval)
+            
+            if raw is None or len(raw) == 0:
+                continue
+
+            df = pd.DataFrame(raw)
+            if not df.empty:
+                return _normalize_ohlc_df(df)
+
+        except RuntimeError as e:
+            # Catch the specific auth error from Dhan_Tradehull and escalate
+            if "Authentication failed" in str(e):
+                raise e
+            print(f"[WARN] Fetch failed for {sym} ({exchange}, TF={interval}): {e}")
+        except Exception as e:
+            print(f"[WARN] Unexpected error for {sym} ({exchange}, TF={interval}): {e}")
+    return pd.DataFrame()
+
+def get_index_ohlc(
+    base_symbol: str,
+    interval: Union[int, str] = 5,
+    lookback_bars: int = 500
+) -> Optional[pd.DataFrame]:
+    """
+    Fetches OHLC data for a given index (e.g., 'NIFTY', 'BANKNIFTY').
+    It resiliently tries multiple known aliases for the symbol.
+    """
+    _ensure_client()
+    iv = _coerce_timeframe(interval)
+    print(f"[FETCH] {base_symbol.upper()} OHLC for interval={iv}m")
+
+    canonical_name = next((k for k, v in ALIAS_MAP.items() if base_symbol.upper() in v["aliases"]), None)
+    if not canonical_name:
+        raise ValueError(f"'{base_symbol}' is not a configured index.")
+
+    aliases = ALIAS_MAP[canonical_name]["aliases"]
+    
+    # Indices are fetched from the INDEX segment
+    df = _try_symbols(aliases, exchange="INDEX", interval=iv)
+
+    if df is None or df.empty:
+        print(f"[ERROR] Could not retrieve {base_symbol.upper()} candles.")
+        return None
+
+    if len(df) > lookback_bars:
+        df = df.iloc[-lookback_bars:].copy()
+
+    if len(df) < 50:
+        print(f"[WARN] Insufficient history for {base_symbol.upper()} (<50 bars). Returning what was found.")
+
+    return df
+
+def get_nifty_ohlc(interval: Union[int, str] = 5, lookback_bars: int = 500) -> Optional[pd.DataFrame]:
+    """Convenience wrapper to fetch NIFTY index OHLC."""
+    return get_index_ohlc("NIFTY", interval, lookback_bars)
+
+def get_option_ohlc(tradingsymbol: str, interval: Union[int, str] = 5, exchange: str = "NFO") -> pd.DataFrame:
+    """
+    Fetches option OHLC for a given SEM_TRADING_SYMBOL.
+    Raises RuntimeError on failure so callers can handle it.
+    """
+    tsl = _ensure_client()
+    tf = _coerce_timeframe(interval)
+    try:
+        raw = tsl.get_intraday_data(tradingsymbol=tradingsymbol, exchange=exchange, timeframe=tf)
+        if raw is None or len(raw) == 0:
+            raise RuntimeError(f"Received empty OHLC for {tradingsymbol}")
+        
+        df = pd.DataFrame(raw)
+        return _normalize_ohlc_df(df)
+
+    except Exception as e:
+        raise RuntimeError(f"OHLC fetch failed for {tradingsymbol} ({exchange}, TF={tf}): {e}")
+
+# --- Main Execution / Smoke Test ---
+if __name__ == "__main__":
+    print("[INFO] Testing data_fetcher.py functionality...")
+    try:
+        set_tsl()
+        
+        # 1. Fetch NIFTY OHLC
+        nifty_data = get_nifty_ohlc(interval=5)
+        if nifty_data is not None and not nifty_data.empty:
+            print("\n[SUCCESS] Fetched NIFTY OHLC data:")
+            print(nifty_data.tail(3))
+            spot = nifty_data['close'].iloc[-1]
+
+            # 2. Resolve ATM symbols
+            atm_symbols = get_atm_option_symbols(base_symbol="NIFTY", spot=spot)
+            ce_sym = atm_symbols["CE_symbol"]
+            
+            # 3. Fetch Option OHLC
+            ce_data = get_option_ohlc(ce_sym, interval=5)
+            if ce_data is not None and not ce_data.empty:
+                print(f"\n[SUCCESS] Fetched OHLC for ATM CE ({ce_sym}):")
+                print(ce_data.tail(3))
+            else:
+                print(f"[ERROR] Failed to fetch OHLC for {ce_sym}")
+        else:
+            print("[ERROR] Failed to fetch NIFTY OHLC data.")
+
+    except Exception as e:
+        print(f"\n[SMOKE TEST EXCEPTION] {e}")
+        import traceback
+        traceback.print_exc()
