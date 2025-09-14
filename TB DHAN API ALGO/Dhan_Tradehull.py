@@ -173,7 +173,7 @@ class Tradehull:
 			product = {'MIS':self.Dhan.INTRA, 'MARGIN':self.Dhan.MARGIN, 'MTF':self.Dhan.MTF, 'CO':self.Dhan.CO,'BO':self.Dhan.BO, 'CNC': self.Dhan.CNC}
 			Validity = {'DAY': "DAY", 'IOC': 'IOC'}
 			transactiontype = {'BUY': self.Dhan.BUY, 'SELL': self.Dhan.SELL}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			amo_time_check = ['PRE_OPEN', 'OPEN', 'OPEN_30', 'OPEN_60']
 
 			if after_market_order:
@@ -260,7 +260,7 @@ class Tradehull:
 			product = {'MIS':self.Dhan.INTRA, 'MARGIN':self.Dhan.MARGIN, 'MTF':self.Dhan.MTF, 'CO':self.Dhan.CO,'BO':self.Dhan.BO, 'CNC': self.Dhan.CNC}
 			Validity = {'DAY': "DAY", 'IOC': 'IOC'}
 			transactiontype = {'BUY': self.Dhan.BUY, 'SELL': self.Dhan.SELL}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			amo_time_check = ['PRE_OPEN', 'OPEN', 'OPEN_30', 'OPEN_60']
 
 			if after_market_order:
@@ -359,19 +359,13 @@ class Tradehull:
 		try:
 			response = self.Dhan.get_fund_limits()
 			if response['status']!='failure':
-				# Check if 'availableBalance' key exists in the response
-				if 'data' in response and 'availableBalance' in response['data']:
-					balance = float(response['data']['availableBalance'])
-					return balance
-				else:
-					# Print the response for debugging
-					print(f"[DEBUG] get_fund_limits response: {response}")
-					return 0
+				balance = float(response['data']['availabelBalance'])
+				return balance
 			else:
 				raise Exception(response)
 		except Exception as e:
-			print(f"Error at Getting balance as {e}")
-			self.logger.exception(f"Error at Getting balance as {e}")
+			print(f"Error at Gettting balance as {e}")
+			self.logger.exception(f"Error at Gettting balance as {e}")
 			return 0
 	
 
@@ -386,16 +380,12 @@ class Tradehull:
 			start_date = (datetime.datetime.now()-datetime.timedelta(days=5)).strftime('%Y-%m-%d')
 			from_date = from_date.strftime('%Y-%m-%d')
 			to_date = datetime.datetime.now().strftime('%Y-%m-%d')
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			tradingsymbol = "NIFTY"
 			exchange = "NSE"
 			exchange_segment = self.Dhan.INDEX
 			security_id 	= instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_SMST_SECURITY_ID']
-			# Get instrument type
-			instrument_type_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
-			if instrument_type_check.empty:
-				raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}' when getting instrument type.")
-			instrument_type = instrument_type_check.iloc[-1]['SEM_INSTRUMENT_NAME']
+			instrument_type = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_INSTRUMENT_NAME']
 			expiry_code 	= instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_EXPIRY_CODE']
 			time.sleep(0.5)
 			ohlc = self.Dhan.historical_daily_data(int(security_id),exchange_segment,instrument_type,from_date,to_date,int(expiry_code))
@@ -424,30 +414,26 @@ class Tradehull:
 			to_date = datetime.datetime.now().strftime('%Y-%m-%d') 
 			# script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO":self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
 			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			exchange_segment = script_exchange[exchange]
-			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE", "NIFTY 50":'NSE'}
+			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE"}
 			if tradingsymbol in index_exchange:
 				exchange =index_exchange[tradingsymbol]
 
 			if tradingsymbol in self.commodity_step_dict.keys():
 				security_check = instrument_df[(instrument_df['SEM_EXM_EXCH_ID']=='MCX')&(instrument_df['SM_SYMBOL_NAME']==tradingsymbol.upper())&(instrument_df['SEM_INSTRUMENT_NAME']=='FUTCOM')]						
 				if security_check.empty:
-					raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}'.")
+					raise Exception("Check the Tradingsymbol or Exchange")
 				security_id = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_SMST_SECURITY_ID']
 				tradingsymbol = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_CUSTOM_SYMBOL']
 			else:						
 				security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
 				if security_check.empty:
-					raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}'.")
+					raise Exception("Check the Tradingsymbol or Exchange")
 				security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']						
 
 			Symbol 			= instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_TRADING_SYMBOL']
-			# Get instrument type
-			instrument_type_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
-			if instrument_type_check.empty:
-				raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}' when getting instrument type.")
-			instrument_type = instrument_type_check.iloc[-1]['SEM_INSTRUMENT_NAME']
+			instrument_type = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_INSTRUMENT_NAME']
 			if 'FUT' in instrument_type and timeframe.upper()=="DAY":
 				raise Exception('For Future or Commodity, DAY - Timeframe not supported by API, SO choose another timeframe')			
 			expiry_code 	= instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_EXPIRY_CODE']
@@ -475,11 +461,7 @@ class Tradehull:
 				else:
 					return df
 			else:
-				# Check if the error is related to authentication
-				if "DH-906" in str(ohlc) or "Invalid Token" in str(ohlc):
-					raise RuntimeError(f"Authentication failed. Please check your ACCESS_TOKEN in config.py. Error details: {ohlc}")
-				else:
-					raise Exception(ohlc) 
+				raise Exception(ohlc) 
 		except Exception as e:
 			print(f"Exception in Getting OHLC data as {e}")
 			self.logger.exception(f"Exception in Getting OHLC data as {e}")
@@ -505,36 +487,24 @@ class Tradehull:
 
 			# script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.NSE_FNO, "BFO":self.Dhan.BSE_FNO, "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX}
 			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			exchange_segment = script_exchange[exchange]
-			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE", "NIFTY 50":'NSE'}
-			# Check if it's an index symbol first
-			is_index = tradingsymbol in index_exchange
-			
-			if is_index:
-				exchange = index_exchange[tradingsymbol]
-				exchange_segment = script_exchange["INDEX"]
-				security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
-				if security_check.empty:
-					raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}'.")
-				security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
-			elif not is_index and tradingsymbol in self.commodity_step_dict.keys():
+			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE"}
+			if tradingsymbol in index_exchange:
+				exchange =index_exchange[tradingsymbol]
+			if tradingsymbol in self.commodity_step_dict.keys():
 				security_check = instrument_df[(instrument_df['SEM_EXM_EXCH_ID']=='MCX')&(instrument_df['SM_SYMBOL_NAME']==tradingsymbol.upper())&(instrument_df['SEM_INSTRUMENT_NAME']=='FUTCOM')]						
 				if security_check.empty:
-					raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}'.")
+					raise Exception("Check the Tradingsymbol or Exchange")
 				security_id = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_SMST_SECURITY_ID']
 				tradingsymbol = security_check.sort_values(by='SEM_EXPIRY_DATE').iloc[0]['SEM_CUSTOM_SYMBOL']
 			else:						
 				security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
 				if security_check.empty:
-					raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}'.")
+					raise Exception("Check the Tradingsymbol or Exchange")
 				security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']	
 
-			# Get instrument type
-			instrument_type_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
-			if instrument_type_check.empty:
-				raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}' when getting instrument type.")
-			instrument_type = instrument_type_check.iloc[-1]['SEM_INSTRUMENT_NAME']
+			instrument_type = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])].iloc[-1]['SEM_INSTRUMENT_NAME']
 			time.sleep(2)
 			ohlc = self.Dhan.intraday_minute_data(str(security_id),exchange_segment,instrument_type,start_date,end_date,int(1))
 			
@@ -552,11 +522,7 @@ class Tradehull:
 				else:
 					return df
 			else:
-				# Check if the error is related to authentication
-				if "DH-906" in str(ohlc) or "Invalid Token" in str(ohlc):
-					raise RuntimeError(f"Authentication failed. Please check your ACCESS_TOKEN in config.py. Error details: {ohlc}")
-				else:
-					raise Exception(ohlc) 
+				raise Exception(ohlc) 
 		except Exception as e:
 			print(e)
 			self.logger.exception(f"Exception in Getting OHLC data as {e}")
@@ -1415,9 +1381,9 @@ class Tradehull:
 			Underlying = Underlying.upper()
 			exchange = exchange.upper()
 			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			exchange_segment = script_exchange[exchange]
-			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE", "NIFTY 50":'NSE'}
+			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE"}
 			if Underlying in index_exchange:
 				exchange =index_exchange[Underlying]
 
@@ -1446,9 +1412,9 @@ class Tradehull:
 			Underlying = Underlying.upper()
 			exchange = exchange.upper()
 			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			exchange_segment = script_exchange[exchange]
-			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE", "NIFTY 50":'NSE'}
+			index_exchange = {"NIFTY":'NSE',"BANKNIFTY":"NSE","FINNIFTY":"NSE","MIDCPNIFTY":"NSE","BANKEX":"BSE","SENSEX":"BSE"}
 			
 			if Underlying in index_exchange:
 				exchange =index_exchange[Underlying]
@@ -1608,7 +1574,7 @@ class Tradehull:
 			exchange = exchange.upper()
 			instrument_df = self.instrument_df.copy()
 			script_exchange = {"NSE":self.Dhan.NSE, "NFO":self.Dhan.FNO, "BFO":"BSE_FNO", "CUR": self.Dhan.CUR, "BSE":self.Dhan.BSE, "MCX":self.Dhan.MCX, "INDEX":self.Dhan.INDEX}
-			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE', 'INDEX': 'NSE'}
+			instrument_exchange = {'NSE':"NSE",'BSE':"BSE",'NFO':'NSE','BFO':'BSE','MCX':'MCX','CUR':'NSE'}
 			exchange_segment = script_exchange[exchange]
 			product = {'MIS':self.Dhan.INTRA, 'MARGIN':self.Dhan.MARGIN, 'MTF':self.Dhan.MTF, 'CO':self.Dhan.CO,'BO':self.Dhan.BO, 'CNC': self.Dhan.CNC}
 			transactiontype = {'BUY': self.Dhan.BUY, 'SELL': self.Dhan.SELL}			

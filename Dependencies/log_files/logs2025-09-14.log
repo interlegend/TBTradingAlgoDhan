@@ -394,3 +394,28 @@ Traceback (most recent call last):
   File "c:\Users\sakth\Desktop\VSCODE\TB DHAN API ALGO\Dhan_Tradehull.py", line 519, in get_intraday_data
     raise Exception(f"[SYMBOL-ERROR] Security symbol '{tradingsymbol}' not found in instrument master file for exchange '{exchange}'.")
 Exception: [SYMBOL-ERROR] Security symbol 'NIFTY 50' not found in instrument master file for exchange 'NSE'.
+INFO:2025-09-14 20:06:58,434:MainThread:Dhan.py  started system
+INFO:2025-09-14 20:06:58,434:MainThread:STARTED THE PROGRAM
+ERROR:2025-09-14 20:07:02,275:MainThread:Exception in Getting OHLC data as {'status': 'failure', 'remarks': {'error_code': 'DH-905', 'error_type': 'Input_Exception', 'error_message': 'System is unable to fetch data due to incorrect parameters or no data present'}, 'data': {'errorType': 'Input_Exception', 'errorCode': 'DH-905', 'errorMessage': 'System is unable to fetch data due to incorrect parameters or no data present'}}
+Traceback (most recent call last):
+  File "c:\Users\sakth\Desktop\VSCODE\TB DHAN API ALGO\Dhan_Tradehull.py", line 525, in get_intraday_data
+    raise Exception(ohlc)
+Exception: {'status': 'failure', 'remarks': {'error_code': 'DH-905', 'error_type': 'Input_Exception', 'error_message': 'System is unable to fetch data due to incorrect parameters or no data present'}, 'data': {'errorType': 'Input_Exception', 'errorCode': 'DH-905', 'errorMessage': 'System is unable to fetch data due to incorrect parameters or no data present'}}
+ERROR:2025-09-14 20:07:02,319:MainThread:Exception in Getting OHLC data as 'INDEX'
+Traceback (most recent call last):
+  File "c:\Users\sakth\Desktop\VSCODE\TB DHAN API ALGO\Dhan_Tradehull.py", line 502, in get_intraday_data
+    security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
+                                                                                                                                                                                 ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 'INDEX'
+ERROR:2025-09-14 20:07:02,351:MainThread:Exception in Getting OHLC data as 'INDEX'
+Traceback (most recent call last):
+  File "c:\Users\sakth\Desktop\VSCODE\TB DHAN API ALGO\Dhan_Tradehull.py", line 502, in get_intraday_data
+    security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
+                                                                                                                                                                                 ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 'INDEX'
+ERROR:2025-09-14 20:07:02,384:MainThread:Exception in Getting OHLC data as 'INDEX'
+Traceback (most recent call last):
+  File "c:\Users\sakth\Desktop\VSCODE\TB DHAN API ALGO\Dhan_Tradehull.py", line 502, in get_intraday_data
+    security_check = instrument_df[((instrument_df['SEM_TRADING_SYMBOL']==tradingsymbol)|(instrument_df['SEM_CUSTOM_SYMBOL']==tradingsymbol))&(instrument_df['SEM_EXM_EXCH_ID']==instrument_exchange[exchange])]
+                                                                                                                                                                                 ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 'INDEX'
