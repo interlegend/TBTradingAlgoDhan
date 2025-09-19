@@ -122,32 +122,96 @@ def get_index_ohlc(
 ) -> Optional[pd.DataFrame]:
     """
     Fetches OHLC data for a given index (e.g., 'NIFTY', 'BANKNIFTY').
-    It resiliently tries multiple known aliases for the symbol.
+    This function is updated to manually resolve the security ID and call the
+    base API directly, bypassing the flawed `get_intraday_data` in the SDK
+    which causes a KeyError for the 'INDEX' exchange type.
     """
-    _ensure_client()
-    iv = _coerce_timeframe(interval)
-    print(f"[FETCH] {base_symbol.upper()} OHLC for interval={iv}m")
+    tsl = _ensure_client()
+    tf = _coerce_timeframe(interval)
+    print(f"[FETCH] {base_symbol.upper()} OHLC for interval={tf}m via direct API call.")
 
-    canonical_name = next((k for k, v in ALIAS_MAP.items() if base_symbol.upper() in v["aliases"]), None)
-    if not canonical_name:
-        raise ValueError(f"'{base_symbol}' is not a configured index.")
+    try:
+        # 1. Resolve symbol and find its security ID from the instrument master
+        canonical_name = next((k for k, v in ALIAS_MAP.items() if base_symbol.upper() in v["aliases"]), None)
+        if not canonical_name:
+            raise ValueError(f"'{base_symbol}' is not a configured index.")
 
-    aliases = ALIAS_MAP[canonical_name]["aliases"]
-    
-    # Indices are fetched from the INDEX segment, not NSE
-    df = _try_symbols(aliases, exchange="INDEX", interval=iv)
+        instrument_df = tsl.instrument_df
+        # For indices, the trading symbol in the master file is the canonical name (e.g., 'NIFTY 50')
+        # and the instrument type is 'INDEX'.
+        security_check = instrument_df[
+            (instrument_df['SEM_TRADING_SYMBOL'].str.upper() == ALIAS_MAP[canonical_name]["master_name"].upper()) &
+            (instrument_df['SEM_INSTRUMENT_NAME'].str.upper() == 'INDEX')
+        ]
 
-    if df is None or df.empty:
-        print(f"[ERROR] Could not retrieve {base_symbol.upper()} candles.")
+        if security_check.empty:
+            raise RuntimeError(f"Manual lookup failed for index '{base_symbol}'. Could not find it in the instrument master.")
+
+        security_id = security_check.iloc[0]['SEM_SMST_SECURITY_ID']
+        
+        # 2. Direct API call using the resolved security ID
+        start_date = datetime.now().strftime('%Y-%m-%d')
+        end_date = start_date
+        
+        # The exchange_segment for indices is INDEX
+        exchange_segment = tsl.Dhan.INDEX
+        
+        # The underlying API fetches 1-minute data, which we then resample.
+        raw_ohlc = tsl.Dhan.intraday_minute_data(
+            security_id=str(security_id),
+            exchange_segment=exchange_segment,
+            instrument_type='Index', # Instrument type for indices is 'Index'
+            from_date=start_date,
+            to_date=end_date,
+            interval=1
+        )
+
+        if raw_ohlc.get('status') != 'success' or not raw_ohlc.get('data'):
+            raise RuntimeError(f"Received empty or failed OHLC response from base API for {base_symbol}")
+
+        df = pd.DataFrame(raw_ohlc['data'])
+        df['timestamp'] = df['timestamp'].apply(lambda x: tsl.convert_to_date_time(x))
+
+        # 3. Resample to the desired timeframe if needed
+        if tf > 1:
+            # Define resampling rules for OHLCV data
+            resample_rules = {
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }
+            # Set timestamp as index for resampling
+            df.set_index('timestamp', inplace=True)
+            # Resample the dataframe
+            df = df.resample(f'{tf}T').apply(resample_rules).dropna()
+            df.reset_index(inplace=True)
+
+        # 4. Normalize and return
+        df = _normalize_ohlc_df(df)
+
+        if df is None or df.empty:
+            print(f"[ERROR] Could not retrieve {base_symbol.upper()} candles after processing.")
+            return None
+
+        if len(df) > lookback_bars:
+            df = df.iloc[-lookback_bars:].copy()
+
+        if len(df) < 50:
+            print(f"[WARN] Insufficient history for {base_symbol.upper()} (<50 bars). Returning what was found.")
+
+        return df
+
+    except Exception as e:
+        print(f"[ERROR] Direct fetch for index {base_symbol} failed: {e}")
+        # As a fallback, we can try the old method, though it might fail
+        print("[WARN] Falling back to legacy _try_symbols method...")
+        canonical_name = next((k for k, v in ALIAS_MAP.items() if base_symbol.upper() in v["aliases"]), canonical_name)
+        if canonical_name:
+            aliases = ALIAS_MAP[canonical_name]["aliases"]
+            return _try_symbols(aliases, exchange="INDEX", interval=tf)
         return None
-
-    if len(df) > lookback_bars:
-        df = df.iloc[-lookback_bars:].copy()
-
-    if len(df) < 50:
-        print(f"[WARN] Insufficient history for {base_symbol.upper()} (<50 bars). Returning what was found.")
-
-    return df
 
 def get_nifty_ohlc(interval: Union[int, str] = 5, lookback_bars: int = 500) -> Optional[pd.DataFrame]:
     """Convenience wrapper to fetch NIFTY index OHLC."""

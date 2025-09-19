@@ -16,13 +16,16 @@ ALIAS_MAP: Dict[str, Dict] = {
     "NIFTY": {
         "aliases": {"NIFTY", "NIFTY 50", "NIFTY50", "NIFTY INDEX"},
         "step": 50,
+        "master_name": "NIFTY 50",
     },
     "BANKNIFTY": {
         "aliases": {"BANKNIFTY", "NIFTY BANK", "BANKNIFTY INDEX"},
         "step": 100,
+        "master_name": "NIFTY BANK",
     },
     "FINNIFTY": {
         "aliases": {"FINNIFTY", "NIFTY FIN SERVICE", "FINNIFTY INDEX"},
         "step": 50,
+        "master_name": "NIFTY FIN SERVICE",
     },
 }
