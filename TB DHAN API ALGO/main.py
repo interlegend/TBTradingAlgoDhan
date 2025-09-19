@@ -1,7 +1,7 @@
 
 # === Imports ===
 from data_fetcher import get_live_data
-from strategy_v21 import add_indicators, generate_signals
+from strategy_v25 import add_indicators, generate_signals
 from order_manager import get_atm_option_symbol, place_option_order
 
 

@@ -6,7 +6,7 @@ import numpy as np
 import pytz
 from datetime import datetime, time as dtime
 
-from data_fetcher import get_nifty_ohlc, get_option_ohlc, set_tsl
+from data_fetcher import get_nifty_ohlc, get_option_ohlc, set_tsl, get_nifty_spot_price
 from strategy_v25 import EMA, MACD, ATR, check_entry
 from order_manager import get_atm_option_symbols
 from config import LOT_SIZE, CLIENT_ID, ACCESS_TOKEN
@@ -67,10 +67,10 @@ def print_summary():
     wins = (df["PnL_INR"] > 0).sum()
     winrate = (wins / total) * 100 if total else 0.0
     pnl_total = df["PnL_INR"].sum()
-    print("\n=== 📊 PAPER TRADING SUMMARY ===")
+    print("\n=== PAPER TRADING SUMMARY ===")
     print(f"Total Trades: {total}")
     print(f"Winrate: {winrate:.2f}%")
-    print(f"Net PnL: ₹{pnl_total:.2f}")
+    print(f"Net PnL: {pnl_total:.2f}")
     print("================================")
 
 # ----------------------
@@ -95,38 +95,45 @@ def main():
     print("[INFO] Starting PAPER TRADER for Strategy V25 (TradeHull, Fusion)")
     position = None
 
-    # 1) Fetch NIFTY to get spot and reference datetime (resilient aliasing lives in get_nifty_ohlc)
-    df_nifty = get_nifty_ohlc(interval=5)
-    if df_nifty is None or df_nifty.empty:
-        print("[ERROR] Failed to fetch NIFTY OHLC for spot calculation. Aborting.")
+    # 1) Fetch NIFTY to get spot and reference datetime
+    try:
+        spot = get_nifty_spot_price()
+        test_date = datetime.now(IST)  # Use current time for test_date
+        print(f"[INFO] NIFTY spot={spot} at {test_date}")
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch NIFTY spot price: {e}. Aborting.")
         return
-
-    # Ensure datetime is tz-aware and sorted
-    if "datetime" not in df_nifty.columns:
-        print("[ERROR] NIFTY dataset missing 'datetime' column. Aborting.")
-        return
-    df_nifty["datetime"] = pd.to_datetime(df_nifty["datetime"], errors="coerce")
-    df_nifty = df_nifty.dropna(subset=["datetime"]).sort_values("datetime").reset_index(drop=True)
-    if df_nifty.empty:
-        print("[ERROR] NIFTY OHLC empty after datetime normalization. Aborting.")
-        return
-
-    spot = float(df_nifty["close"].iloc[-1])
-    test_date = df_nifty["datetime"].iloc[-1]  # use latest candle datetime (IST)
-    print(f"[INFO] NIFTY spot={spot} at {test_date}")
 
     # 2) Resolve ATM CE/PE SEM_TRADING_SYMBOLs
     try:
-        atm = get_atm_option_symbols(spot=spot, when_dt=test_date)
+        atm = get_atm_option_symbols(base_symbol="NIFTY", spot=spot, when_dt=test_date)
         ce_symbol, pe_symbol = atm["CE_symbol"], atm["PE_symbol"]
         print(f"[INFO] ATM Symbols: CE={ce_symbol} | PE={pe_symbol}")
+        # Debug: Show resolved contract row from instrument master
+        print(f"[DEBUG] ATM Option Metadata: {atm}")
+        # Deep debug: print full instrument row for CE symbol
+        instrument_csv_path = None
+        import glob, os
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(script_dir)
+        primary_pattern = os.path.join(project_root, 'Dependencies', 'all_instrument*.csv')
+        files = sorted(glob.glob(primary_pattern, recursive=False), key=os.path.getmtime)
+        if files:
+            instrument_csv_path = files[-1]
+        if instrument_csv_path:
+            import pandas as pd
+            inst_df = pd.read_csv(instrument_csv_path, low_memory=False)
+            ce_row = inst_df[inst_df['SEM_TRADING_SYMBOL'].astype(str).str.upper() == str(ce_symbol).upper()]
+            if not ce_row.empty:
+                print("[DEBUG] Full instrument row for CE symbol:")
+                print(ce_row.iloc[0].to_dict())
     except Exception as e:
         print(f"[ERROR] Failed to resolve ATM symbols: {e}")
         return
 
     # 3) Fetch CE/PE OHLC (5m); data_fetcherperp already enforces timeframe + tz + column checks
-    ce_ohlc = get_option_ohlc(ce_symbol, interval=5, exchange="NFO")
-    pe_ohlc = get_option_ohlc(pe_symbol, interval=5, exchange="NFO")
+    ce_ohlc = get_option_ohlc(str(ce_symbol), interval=5, exchange='NFO')
+    pe_ohlc = get_option_ohlc(str(pe_symbol), interval=5, exchange='NFO')
 
     if ce_ohlc.empty or pe_ohlc.empty:
         print("[ERROR] One or both option OHLC datasets are empty. Aborting.")

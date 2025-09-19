@@ -142,7 +142,7 @@ def get_atm_option_symbols(
 
     # 4. Filter for relevant option contracts
     q = inst_df[
-        inst_df["UNDERLYING"].isin(aliases)
+        inst_df["UNDERLYING"].str.startswith(canonical_symbol)
         & inst_df["STRIKE_PRICE"].notna()
         & inst_df["OPTION_TYPE"].isin(["CE", "PE"])
         & (inst_df["EXPIRY"] >= when_date)

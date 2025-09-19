@@ -1,3 +1,4 @@
+
 """
 Data Fetcher for Trader-Baddu Phase 2
 
@@ -152,19 +153,74 @@ def get_nifty_ohlc(interval: Union[int, str] = 5, lookback_bars: int = 500) -> O
     """Convenience wrapper to fetch NIFTY index OHLC."""
     return get_index_ohlc("NIFTY", interval, lookback_bars)
 
+
+def get_nifty_spot_price() -> float:
+    """
+    Fetches the NIFTY spot price using get_quote_data.
+    """
+    tsl = _ensure_client()
+    try:
+        quote = tsl.get_quote_data(names=['NIFTY'])
+        if quote and 'NIFTY' in quote:
+            return quote['NIFTY']['last_price']
+        else:
+            raise RuntimeError("Failed to get quote for NIFTY")
+    except Exception as e:
+        print(f"[FATAL] Could not get NIFTY spot price: {e}")
+        raise
+
 def get_option_ohlc(tradingsymbol: str, interval: Union[int, str] = 5, exchange: str = "NFO") -> pd.DataFrame:
     """
     Fetches option OHLC for a given SEM_TRADING_SYMBOL.
-    Raises RuntimeError on failure so callers can handle it.
+    This function contains a workaround to bypass the flawed get_intraday_data in the SDK.
+    It performs the instrument lookup manually and calls the base API method directly.
     """
     tsl = _ensure_client()
     tf = _coerce_timeframe(interval)
+    
     try:
-        raw = tsl.get_intraday_data(tradingsymbol=tradingsymbol, exchange=exchange, timeframe=tf)
-        if raw is None or len(raw) == 0:
-            raise RuntimeError(f"Received empty OHLC for {tradingsymbol}")
+        instrument_df = tsl.instrument_df
         
-        df = pd.DataFrame(raw)
+        # Manual Lookup: Case-insensitive, hardcoded to look for 'NSE' in the file as that's where NFO instruments are.
+        security_check = instrument_df[
+            (instrument_df['SEM_TRADING_SYMBOL'].str.upper() == tradingsymbol.upper()) &
+            (instrument_df['SEM_EXM_EXCH_ID'] == 'NSE')
+        ]
+
+        if security_check.empty:
+            raise RuntimeError(f"Manual lookup failed for symbol '{tradingsymbol}'")
+
+        security_id = security_check.iloc[-1]['SEM_SMST_SECURITY_ID']
+        instrument_type = security_check.iloc[-1]['SEM_INSTRUMENT_NAME']
+        
+        # Direct API call, bypassing the broken SDK wrapper function
+        start_date = datetime.now().strftime('%Y-%m-%d')
+        end_date = start_date
+        
+        # The exchange_segment for options is FNO
+        exchange_segment = tsl.Dhan.FNO 
+        
+        # The underlying API fetches 1-minute data, which we then resample.
+        raw_ohlc = tsl.Dhan.intraday_minute_data(
+            security_id=str(security_id),
+            exchange_segment=exchange_segment,
+            instrument_type=instrument_type,
+            from_date=start_date,
+            to_date=end_date,
+            interval=1
+        )
+
+        if raw_ohlc.get('status') != 'success' or not raw_ohlc.get('data'):
+            raise RuntimeError(f"Received empty or failed OHLC response from base API for {tradingsymbol}")
+
+        df = pd.DataFrame(raw_ohlc['data'])
+        df['timestamp'] = df['timestamp'].apply(lambda x: tsl.convert_to_date_time(x))
+
+        # Resample to the desired timeframe
+        if tf > 1:
+            available_frames = {5: '5T', 15: '15T', 60: '60T'} # Simplified for this use case
+            df = tsl.resample_timeframe(df, available_frames.get(tf, '5T'))
+
         return _normalize_ohlc_df(df)
 
     except Exception as e:
