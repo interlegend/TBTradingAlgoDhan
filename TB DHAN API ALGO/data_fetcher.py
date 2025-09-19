@@ -134,8 +134,8 @@ def get_index_ohlc(
 
     aliases = ALIAS_MAP[canonical_name]["aliases"]
     
-    # Indices are fetched from the NSE segment, not INDEX
-    df = _try_symbols(aliases, exchange="NSE", interval=iv)
+    # Indices are fetched from the INDEX segment, not NSE
+    df = _try_symbols(aliases, exchange="INDEX", interval=iv)
 
     if df is None or df.empty:
         print(f"[ERROR] Could not retrieve {base_symbol.upper()} candles.")

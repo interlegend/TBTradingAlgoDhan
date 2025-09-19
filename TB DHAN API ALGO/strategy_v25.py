@@ -198,30 +198,7 @@ def backtest(data):
                 position = None
                 continue
             
-
-    # === Save Trade Log ===
-    trade_rows, pnl = [], []
-    for tr in trades:
-        et, side, entry, xt, xp, reason, sl_val = tr
-        pnl_pts = (xp - entry) if side == "BUY_CE" else (entry - xp)
-        pnl_inr = pnl_pts * 75
-        pnl.append(pnl_inr)
-        trade_rows.append([
-            et, side, entry, xt, xp, reason,
-            sl_val,  # new column
-            round(pnl_pts, 2), round(pnl_inr, 2)
-        ])
-
-    pd.DataFrame(trade_rows, columns=[
-        "EntryTime", "Side", "EntryPrice", "ExitTime", "ExitPrice", "Reason",
-        "Exit_SL_Value",  # new column
-        "PnL_Points", "PnL_INR"
-    ]).to_csv("C:\\Users\\sakth\\Desktop\\VSCODE\\TB DHAN API ALGO\\V25Trade_Log.csv", index=False)
-
-    print("\n=== 📈 SUMMARY ===")
-    print(f"Total Trades: {len(trades)}")
-    print(f"Winrate: {(np.array(pnl) > 0).mean() * 100:.2f}%")
-    print(f"PnL: ₹{sum(pnl):.2f}")
+    return trades
 
 
 
